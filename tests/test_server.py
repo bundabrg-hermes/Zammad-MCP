@@ -514,7 +514,9 @@ def test_add_article_tool(mock_zammad_client, sample_article_data, decorator_cap
     server_inst._setup_tools()
 
     # Test with ArticleCreate params using Enum values
-    params = ArticleCreate(ticket_id=1, body="New comment", article_type=ArticleType.NOTE, sender=ArticleSender.AGENT)
+    params = ArticleCreate(
+        ticket_id=1, body="New comment", article_type=ArticleType.NOTE, internal=False, sender=ArticleSender.AGENT
+    )
     result = test_tools["zammad_add_article"](params)
 
     assert result.body == "Test article"
@@ -550,7 +552,7 @@ def test_add_article_with_time_unit_tool(mock_zammad_client, sample_article_data
     server_inst.get_client = lambda: server_inst.client  # type: ignore[method-assign, assignment, return-value]
     server_inst._setup_tools()
 
-    params = ArticleCreate(ticket_id=1, body="Worked on this issue", time_unit=30.5)
+    params = ArticleCreate(ticket_id=1, body="Worked on this issue", internal=False, time_unit=30.5)
     result = test_tools["zammad_add_article"](params)
 
     assert result.body == "Test article"
@@ -577,6 +579,7 @@ def test_add_article_with_email_fields(mock_zammad_client, sample_article_data, 
         ticket_id=1,
         body="<p>Email body</p>",
         article_type=ArticleType.EMAIL,
+        internal=False,
         subject="Follow up",
         to="customer@example.com",
         cc="manager@example.com",
@@ -609,7 +612,7 @@ def test_add_article_without_time_unit_tool(mock_zammad_client, sample_article_d
     server_inst.get_client = lambda: server_inst.client  # type: ignore[method-assign, assignment, return-value]
     server_inst._setup_tools()
 
-    params = ArticleCreate(ticket_id=1, body="Simple comment")
+    params = ArticleCreate(ticket_id=1, body="Simple comment", internal=False)
     result = test_tools["zammad_add_article"](params)
 
     assert result.body == "Test article"
@@ -621,47 +624,47 @@ def test_add_article_without_time_unit_tool(mock_zammad_client, sample_article_d
 
 def test_add_article_content_type_validation() -> None:
     """Test ArticleCreate accepts supported content types and rejects unsupported values."""
-    html_article = ArticleCreate(ticket_id=1, body="<p>safe</p>", content_type="text/html")
+    html_article = ArticleCreate(ticket_id=1, body="<p>safe</p>", internal=True, content_type="text/html")
     assert html_article.body == "<p>safe</p>"
 
-    plain_article = ArticleCreate(ticket_id=1, body="<p>plain</p>", content_type="text/plain")
+    plain_article = ArticleCreate(ticket_id=1, body="<p>plain</p>", internal=True, content_type="text/plain")
     assert plain_article.body == "&lt;p&gt;plain&lt;/p&gt;"
 
     with pytest.raises(ValidationError, match="content_type"):
-        ArticleCreate(ticket_id=1, body="test", content_type="application/json")  # type: ignore[arg-type]
+        ArticleCreate(ticket_id=1, body="test", internal=True, content_type="application/json")  # type: ignore[arg-type]
 
 
 def test_add_article_invalid_time_unit():
     """Test that ArticleCreate rejects invalid time_unit values."""
     with pytest.raises(ValidationError, match="time_unit"):
-        ArticleCreate(ticket_id=1, body="test", time_unit=0)
+        ArticleCreate(ticket_id=1, body="test", internal=True, time_unit=0)
 
     with pytest.raises(ValidationError, match="time_unit"):
-        ArticleCreate(ticket_id=1, body="test", time_unit=-5)
+        ArticleCreate(ticket_id=1, body="test", internal=True, time_unit=-5)
 
 
 def test_add_article_invalid_type():
     """Test that ArticleCreate rejects invalid article types."""
     # Test invalid article type
     with pytest.raises(ValidationError, match="article_type"):
-        ArticleCreate(ticket_id=1, body="test", article_type="invalid_type")
+        ArticleCreate(ticket_id=1, body="test", internal=True, article_type="invalid_type")
 
 
 def test_add_article_invalid_sender():
     """Test that ArticleCreate rejects invalid sender types."""
     # Test invalid sender
     with pytest.raises(ValidationError, match="sender"):
-        ArticleCreate(ticket_id=1, body="test", sender="InvalidSender")
+        ArticleCreate(ticket_id=1, body="test", internal=True, sender="InvalidSender")
 
 
 def test_add_article_backward_compat_alias():
     """Test that ArticleCreate accepts 'type' alias for backward compatibility."""
     # Test using alias 'type' instead of 'article_type'
-    params = ArticleCreate(ticket_id=1, body="test", type="email")
+    params = ArticleCreate(ticket_id=1, body="test", internal=False, type="email")
     assert params.article_type == ArticleType.EMAIL
 
     # Test that field is accessible as article_type
-    params2 = ArticleCreate(ticket_id=1, body="test", type=ArticleType.PHONE)
+    params2 = ArticleCreate(ticket_id=1, body="test", internal=False, type=ArticleType.PHONE)
     assert params2.article_type == ArticleType.PHONE
 
 

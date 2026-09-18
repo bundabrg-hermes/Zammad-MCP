@@ -102,6 +102,7 @@ MAX_PER_PAGE = 100  # Maximum results per page for pagination
 CHARACTER_LIMIT = 25000  # Maximum response size per MCP best practices
 ARTICLE_BODY_TRUNCATE_LENGTH = 500  # Maximum length for article body in markdown formatting
 
+
 # Tool annotation constants
 def _read_only_annotations(title: str) -> ToolAnnotations:
     """Create read-only tool annotations with title."""
@@ -1174,7 +1175,7 @@ class ZammadMCPServer:
                     - ticket_id (int): Internal database ID (required, NOT display number)
                     - body (str): Article content/message (required)
                     - article_type (ArticleType): Type enum - NOTE, EMAIL, etc. (required)
-                    - internal (bool): Internal note vs customer-visible (default: False)
+                    - internal (bool): Internal note (True) vs customer-visible (False). REQUIRED — omitting it fails validation (no public default)
                     - subject (str | None): Article subject (for emails)
                     - content_type (str | None): text/plain or text/html (default: text/plain)
                     - to (str | None): Email recipient (for email type)

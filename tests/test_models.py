@@ -94,6 +94,7 @@ class TestArticleCreate:
         article = ArticleCreate(
             ticket_id=123,
             body="<div onclick='alert()'>Click me</div>",
+            internal=True,
         )
         assert article.body == "&lt;div onclick=&#x27;alert()&#x27;&gt;Click me&lt;/div&gt;"
 
@@ -102,6 +103,26 @@ class TestArticleCreate:
         with pytest.raises(ValidationError) as exc_info:
             ArticleCreate(ticket_id=0, body="Test")
         assert "Input should be greater than 0" in str(exc_info.value)
+
+    def test_internal_is_required(self):
+        """Test that internal is required with no default (safe-by-default guard).
+
+        A forgotten visibility flag must fail validation rather than silently
+        default to a customer-visible (public) article.
+        """
+        with pytest.raises(ValidationError):
+            ArticleCreate(ticket_id=123, body="Test")
+
+    def test_internal_required_in_schema(self):
+        """Test that the tool JSON schema marks internal as required, no default."""
+        schema = ArticleCreate.model_json_schema()
+        assert "internal" in schema["required"]
+        assert "default" not in schema["properties"]["internal"]
+
+    def test_internal_accepts_explicit_values(self):
+        """Test that explicit internal True/False are accepted."""
+        assert ArticleCreate(ticket_id=123, body="Test", internal=True).internal is True
+        assert ArticleCreate(ticket_id=123, body="Test", internal=False).internal is False
 
     def test_field_length_limits(self):
         """Test that field length limits are enforced."""
@@ -163,6 +184,7 @@ class TestArticleCreateWithAttachments:
         article = ArticleCreate(
             ticket_id=123,
             body="See attached",
+            internal=True,
             attachments=[AttachmentUpload(filename="doc.pdf", data="dGVzdA==", mime_type="application/pdf")],
         )
         assert article.ticket_id == 123
@@ -188,6 +210,7 @@ class TestArticleCreateWithAttachments:
         article = ArticleCreate(
             ticket_id=123,
             body="Boundary test",
+            internal=True,
             attachments=[
                 AttachmentUpload(filename=f"file{i}.txt", data="dGVzdA==", mime_type="text/plain") for i in range(10)
             ],
@@ -196,8 +219,8 @@ class TestArticleCreateWithAttachments:
         assert len(article.attachments) == 10
 
     def test_article_without_attachments(self):
-        """Test creating article without attachments (backward compatibility)."""
-        article = ArticleCreate(ticket_id=123, body="Simple comment")
+        """Test creating article without attachments."""
+        article = ArticleCreate(ticket_id=123, body="Simple comment", internal=True)
         assert article.ticket_id == 123
         assert article.body == "Simple comment"
         assert article.attachments is None
