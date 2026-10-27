@@ -1,7 +1,6 @@
 """Pydantic models for Zammad entities."""
 
 import base64
-import html
 import os
 from datetime import date, datetime
 from enum import Enum
@@ -266,11 +265,10 @@ class TicketCreate(StrictBaseModel):
     article_type: str = Field(default="note", description="Article type (note, email, phone)", max_length=50)
     article_internal: bool = Field(default=False, description="Whether the article is internal")
 
-    @field_validator("title", "article_body")
-    @classmethod
-    def sanitize_html(cls, v: str) -> str:
-        """Escape HTML to prevent XSS attacks."""
-        return html.escape(v)
+    # NOTE (2026-10-27): the upstream client-side html.escape() of title/article_body was
+    # REMOVED. Zammad treats titles as plain text (escaped at render time) and sanitizes
+    # text/html bodies server-side; escaping here corrupted data at rest — e.g. real
+    # voicemail ticket titles stored as "Bloom&#x27;s ..." (zepli #664109).
 
 
 class TicketUpdate(StrictBaseModel):
@@ -285,11 +283,7 @@ class TicketUpdate(StrictBaseModel):
         None, description="Time spent for time accounting (unit defined in Zammad admin settings)", gt=0
     )
 
-    @field_validator("title")
-    @classmethod
-    def sanitize_title(cls, v: str | None) -> str | None:
-        """Escape HTML to prevent XSS attacks."""
-        return html.escape(v) if v else v
+    # NOTE (2026-10-27): html.escape() title validator removed — see TicketCreate note.
 
 
 class TicketSearchParams(StrictBaseModel):
@@ -341,10 +335,13 @@ class ArticleCreate(StrictBaseModel):
 
     @model_validator(mode="after")
     def sanitize_body(self) -> "ArticleCreate":
-        """Sanitize body content according to content type."""
-        if self.content_type == "text/plain":
-            self.body = html.escape(self.body)
-        else:
+        """Neutralize high-risk markup in HTML bodies; plain-text bodies pass through raw.
+
+        NOTE (2026-10-27): text/plain bodies used to be html.escape()d, which stored
+        literal entities (&#x27;, &quot;) in Zammad data at rest. Zammad handles plain
+        bodies as text; escaping here only corrupted content.
+        """
+        if self.content_type == "text/html":
             self.body = self._sanitize_html_body(self.body)
         return self
 
@@ -380,11 +377,7 @@ class TicketUpdateParams(StrictBaseModel):
         None, description="Time spent for time accounting (unit defined in Zammad admin settings)", gt=0
     )
 
-    @field_validator("title")
-    @classmethod
-    def sanitize_title(cls, v: str | None) -> str | None:
-        """Escape HTML to prevent XSS attacks."""
-        return html.escape(v) if v else v
+    # NOTE (2026-10-27): html.escape() title validator removed — see TicketCreate note.
 
 
 class GetArticleAttachmentsParams(StrictBaseModel):
@@ -576,10 +569,8 @@ class UserCreate(StrictBaseModel):
             raise ValueError(f"Invalid email: '{v}'. Example: user@example.com")
         return v.lower()
 
-    @field_validator("firstname", "lastname")
-    @classmethod
-    def sanitize_names(cls, v: str) -> str:
-        return html.escape(v)
+    # NOTE (2026-10-27): html.escape() of names removed — it corrupted names like
+    # O'Connor at rest; Zammad escapes names at render time.
 
 
 class Organization(BaseModel):

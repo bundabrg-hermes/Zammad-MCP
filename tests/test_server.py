@@ -628,7 +628,7 @@ def test_add_article_content_type_validation() -> None:
     assert html_article.body == "<p>safe</p>"
 
     plain_article = ArticleCreate(ticket_id=1, body="<p>plain</p>", internal=True, content_type="text/plain")
-    assert plain_article.body == "&lt;p&gt;plain&lt;/p&gt;"
+    assert plain_article.body == "<p>plain</p>"  # plain bodies pass through verbatim
 
     with pytest.raises(ValidationError, match="content_type"):
         ArticleCreate(ticket_id=1, body="test", internal=True, content_type="application/json")  # type: ignore[arg-type]
@@ -2988,15 +2988,15 @@ def test_user_create_email_normalization():
     assert user.email == "test@example.com"
 
 
-def test_user_create_html_sanitization():
-    """Test UserCreate sanitizes HTML in names."""
+def test_user_create_names_pass_through_verbatim():
+    """Names must NOT be html-escaped client-side (O'Connor would corrupt at rest)."""
     user = UserCreate(
         email="test@example.com",
-        firstname="<script>alert('xss')</script>",
+        firstname="Mary",
         lastname="O'Connor",
     )
-    assert "&lt;script&gt;" in user.firstname
-    assert "&#x27;" in user.lastname or "O&#39;Connor" in user.lastname
+    assert user.firstname == "Mary"
+    assert user.lastname == "O'Connor"
 
 
 def test_server_name_follows_mcp_convention():

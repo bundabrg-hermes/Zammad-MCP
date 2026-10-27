@@ -19,25 +19,25 @@ from mcp_zammad.models import (
 class TestTicketCreate:
     """Test TicketCreate model validation."""
 
-    def test_html_sanitization_in_title(self):
-        """Test that HTML is escaped in ticket title."""
+    def test_title_passes_through_verbatim(self):
+        """Titles must NOT be html-escaped client-side (Zammad escapes at render)."""
         ticket = TicketCreate(
-            title="<script>alert('XSS')</script>",
+            title="Voicemail: Sam from Bloom's Mechanist \"Orange\" - callback",
             group="Support",
             customer="test@example.com",
             article_body="Test body",
         )
-        assert ticket.title == "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
+        assert ticket.title == "Voicemail: Sam from Bloom's Mechanist \"Orange\" - callback"
 
-    def test_html_sanitization_in_body(self):
-        """Test that HTML is escaped in article body."""
+    def test_body_passes_through_verbatim(self):
+        """Initial article bodies must NOT be html-escaped client-side."""
         ticket = TicketCreate(
             title="Test ticket",
             group="Support",
             customer="test@example.com",
-            article_body="<b>Bold</b> and <script>alert('XSS')</script>",
+            article_body="Bloom's <b>Bold</b> body",
         )
-        assert ticket.article_body == "&lt;b&gt;Bold&lt;/b&gt; and &lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
+        assert ticket.article_body == "Bloom's <b>Bold</b> body"
 
     def test_field_length_limits(self):
         """Test that field length limits are enforced."""
@@ -54,10 +54,10 @@ class TestTicketCreate:
 class TestTicketUpdate:
     """Test TicketUpdate model validation."""
 
-    def test_html_sanitization_in_title(self):
-        """Test that HTML is escaped in title update."""
-        update = TicketUpdate(title="<i>Important</i> Update")  # type: ignore[call-arg]
-        assert update.title == "&lt;i&gt;Important&lt;/i&gt; Update"
+    def test_title_passes_through_verbatim(self):
+        """Title updates must NOT be html-escaped client-side."""
+        update = TicketUpdate(title="Bloom's Mechanist Update")  # type: ignore[call-arg]
+        assert update.title == "Bloom's Mechanist Update"
 
     def test_none_title_not_sanitized(self):
         """Test that None title is not processed."""
@@ -89,14 +89,25 @@ class TestTicketUpdateParams:
 class TestArticleCreate:
     """Test ArticleCreate model validation."""
 
-    def test_html_sanitization_in_body(self):
-        """Test that HTML is escaped in article body."""
+    def test_plain_body_passes_through_verbatim(self):
+        """text/plain bodies must NOT be html-escaped (entities would corrupt data at rest)."""
         article = ArticleCreate(
             ticket_id=123,
-            body="<div onclick='alert()'>Click me</div>",
+            body="Bloom's \"Orange\" note",
             internal=True,
         )
-        assert article.body == "&lt;div onclick=&#x27;alert()&#x27;&gt;Click me&lt;/div&gt;"
+        assert article.body == "Bloom's \"Orange\" note"
+
+    def test_html_body_neutralizes_scripts(self):
+        """text/html bodies still get high-risk markup neutralized."""
+        article = ArticleCreate(
+            ticket_id=123,
+            body="<script>alert('XSS')</script>",
+            internal=True,
+            content_type="text/html",
+        )
+        assert "&lt;script" in article.body
+        assert "<script" not in article.body
 
     def test_ticket_id_validation(self):
         """Test that ticket_id must be positive."""
